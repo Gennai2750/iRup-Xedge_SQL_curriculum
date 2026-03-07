@@ -2,7 +2,7 @@
   "name": "sql-curriculum",
   "private": true,
   "scripts": {
-    "test": "jest",
+    "test": "docker compose -f db/docker-compose.yml up -d --wait && jest",
     "practice": "cd db && docker compose up -d --wait && cd .. && ts-node server.ts"
   },
   "devDependencies": {
