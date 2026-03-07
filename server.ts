@@ -242,7 +242,14 @@ app.post('/api/exercises/:index/run', async (req, res) => {
   const client = getClient();
   try {
     await client.connect();
+
+    // DML/DDLがDBを変更しないようトランザクションで囲んでROLLBACKする
+    await client.query('BEGIN');
     const result = await client.query(sql.trim());
+    const rows = result.rows ?? [];
+    const columns = result.fields?.map(f => f.name) ?? [];
+    const { command, rowCount } = result;
+    await client.query('ROLLBACK');
 
     // テスト実行
     const testResult = await runTest(ex);
@@ -251,14 +258,15 @@ app.post('/api/exercises/:index/run', async (req, res) => {
     saveResults(results);
 
     res.json({
-      command: result.command,
-      rowCount: result.rowCount,
-      columns: result.fields?.map(f => f.name) ?? [],
-      rows: result.rows ?? [],
+      command,
+      rowCount,
+      columns,
+      rows,
       testPassed: testResult.passed,
       testMessage: testResult.message,
     });
   } catch (err: unknown) {
+    await client.query('ROLLBACK').catch(() => {});
     const message = err instanceof Error ? err.message : String(err);
 
     // SQLエラーでも不正解として記録

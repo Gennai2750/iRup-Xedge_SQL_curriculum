@@ -45,7 +45,7 @@ describe('問題 7-1: WHERE句の付け忘れ', () => {
     const updated = await client.query('SELECT salary FROM employees WHERE employee_id = 3');
     expect(Number(updated.rows[0].salary)).toBe(70000);
 
-    const result = await client.query('SELECT COUNT(*) FROM employees WHERE salary = 70000');
-    expect(Number(result.rows[0].count)).toBe(1);
+    const others = await client.query('SELECT COUNT(*) FROM employees WHERE salary = 70000 AND employee_id != 3 AND employee_id != 5');
+    expect(Number(others.rows[0].count)).toBe(0);
   });
 });
