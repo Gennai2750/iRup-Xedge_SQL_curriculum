@@ -1,0 +1,19 @@
+name: SQL Auto Grading
+on:
+  pull_request:
+    paths:
+      - 'exercises/**/*.sql'
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start Database
+        run: |
+          cd db && docker compose up -d
+          until docker exec $(docker compose ps -q db) pg_isready -U student; do sleep 1; done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test

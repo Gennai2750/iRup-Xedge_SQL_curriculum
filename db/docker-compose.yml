@@ -1,0 +1,11 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: student
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: curriculum_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
