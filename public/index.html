@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Practice</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 320px;
+      min-width: 320px;
+      background: #1e293b;
+      border-right: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid #334155;
+      font-size: 18px;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .chapter-title {
+      padding: 12px 20px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+    }
+
+    .exercise-item {
+      padding: 10px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      transition: background 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .exercise-item:hover {
+      background: #334155;
+    }
+
+    .exercise-item.active {
+      background: #1e3a5f;
+      border-left-color: #38bdf8;
+    }
+
+    .exercise-item .status {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .exercise-item .status.pass {
+      background: #22c55e;
+      border-color: #22c55e;
+      color: #fff;
+    }
+
+    .exercise-item .status.fail {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: #fff;
+    }
+
+    /* Main area */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Panel header bar */
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 32px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      flex-shrink: 0;
+    }
+
+    .panel-header-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-minimize {
+      background: none;
+      color: #64748b;
+      padding: 2px 8px;
+      font-size: 16px;
+      line-height: 1;
+      border-radius: 4px;
+    }
+
+    .btn-minimize:hover { background: #334155; color: #e2e8f0; }
+
+    .panel-header.collapsed {
+      cursor: pointer;
+      border-bottom: 1px solid #334155;
+    }
+
+    .panel-header.collapsed:hover {
+      background: #334155;
+    }
+
+    /* Question panel */
+    .question-panel {
+      padding: 24px 32px;
+      background: #1e293b;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 40px;
+    }
+
+    .panel-hidden {
+      height: 0 !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      flex: none !important;
+    }
+
+    /* Resize handle */
+    .resize-handle {
+      height: 6px;
+      background: #334155;
+      cursor: row-resize;
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.15s;
+    }
+
+    .resize-handle:hover,
+    .resize-handle.active {
+      background: #38bdf8;
+    }
+
+    .resize-handle::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 2px;
+      background: #64748b;
+      border-radius: 1px;
+    }
+
+    .resize-handle:hover::after,
+    .resize-handle.active::after {
+      background: #fff;
+    }
+
+    .question-panel h1 { font-size: 20px; color: #38bdf8; margin-bottom: 16px; }
+    .question-panel h2 { font-size: 16px; color: #e2e8f0; margin: 16px 0 8px; }
+    .question-panel p { line-height: 1.7; margin-bottom: 8px; }
+    .question-panel code {
+      background: #334155;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      color: #fbbf24;
+    }
+    .question-panel table {
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+      width: 100%;
+    }
+    .question-panel th, .question-panel td {
+      border: 1px solid #475569;
+      padding: 10px 16px;
+      text-align: left;
+    }
+    .question-panel th {
+      background: #334155;
+      color: #38bdf8;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .question-panel td { color: #cbd5e1; }
+    .question-panel tr:nth-child(even) td { background: rgba(51, 65, 85, 0.3); }
+    .question-panel td code {
+      background: #1e293b;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+
+    .placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: #64748b;
+      font-size: 18px;
+    }
+
+    /* Editor area */
+    .editor-area {
+      display: flex;
+      flex-direction: column;
+      padding: 16px 32px;
+      gap: 12px;
+      flex: 1;
+      min-height: 80px;
+      overflow: hidden;
+    }
+
+    .editor-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    textarea {
+      flex: 1;
+      min-height: 60px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 15px;
+      padding: 16px;
+      resize: none;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      border-color: #38bdf8;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    button {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-run {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .btn-run:hover { background: #3b82f6; }
+
+    .btn-run:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+
+    .shortcut-hint {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* Result area */
+    .result-area {
+      height: 200px;
+      min-height: 60px;
+      overflow-y: auto;
+      padding: 16px 32px;
+      flex-shrink: 0;
+    }
+
+    .result-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .result-table {
+      border-collapse: collapse;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      width: 100%;
+    }
+
+    .result-table th {
+      background: #334155;
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      border: 1px solid #475569;
+      color: #38bdf8;
+    }
+
+    .result-table td {
+      padding: 6px 12px;
+      border: 1px solid #334155;
+    }
+
+    .result-table tr:hover td { background: #1e293b; }
+
+    .result-info {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .result-success {
+      color: #22c55e;
+      font-weight: 600;
+    }
+
+    .result-error {
+      background: #3b1117;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      padding: 16px;
+      color: #fca5a5;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .judge-banner {
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: fadeIn 0.3s;
+    }
+
+    .judge-banner.pass {
+      background: #052e16;
+      border: 1px solid #22c55e;
+      color: #4ade80;
+    }
+
+    .judge-banner.fail {
+      background: #3b1117;
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+    }
+
+    .judge-banner .icon {
+      font-size: 22px;
+    }
+
+    .judge-detail {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #fca5a5;
+      background: #1a0a0a;
+      padding: 12px 16px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    .saved-badge {
+      background: #22c55e;
+      color: #fff;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="sidebar-header">SQL Practice</div>
+    <div id="exercise-list"></div>
+  </div>
+  <div class="main" id="main">
+    <div class="placeholder" id="placeholder">左の問題一覧から問題を選択してください</div>
+  </div>
+
+  <script>
+    let exercises = [];
+    let currentIndex = null;
+
+    async function loadExercises() {
+      const res = await fetch('/api/exercises');
+      exercises = await res.json();
+      renderList();
+    }
+
+    function renderList() {
+      const list = document.getElementById('exercise-list');
+      let html = '';
+      let currentChapter = '';
+
+      exercises.forEach(ex => {
+        if (ex.chapter !== currentChapter) {
+          currentChapter = ex.chapter;
+          const label = currentChapter.replace(/_/g, ' ').replace(/^\d+\s*/, m => `第${parseInt(m)}章: `);
+          html += `<div class="chapter-title">${label}</div>`;
+        }
+        const active = ex.index === currentIndex ? ' active' : '';
+        let statusClass = '';
+        let statusIcon = '';
+        if (ex.status === 'pass') { statusClass = ' pass'; statusIcon = '&#10003;'; }
+        else if (ex.status === 'fail') { statusClass = ' fail'; statusIcon = '&#10007;'; }
+        html += `<div class="exercise-item${active}" onclick="selectExercise(${ex.index})">
+          <span class="status${statusClass}">${statusIcon}</span>
+          <span>${ex.title}</span>
+        </div>`;
+      });
+
+      list.innerHTML = html;
+    }
+
+    async function selectExercise(index) {
+      currentIndex = index;
+      renderList();
+
+      const res = await fetch(`/api/exercises/${index}`);
+      const data = await res.json();
+
+      const main = document.getElementById('main');
+      main.innerHTML = `
+        <div class="panel-header" id="header-question">
+          <span class="panel-header-label">問題</span>
+          <button class="btn-minimize" onclick="togglePanel('question')">&#x2212;</button>
+        </div>
+        <div class="question-panel" id="question-panel"></div>
+        <div class="resize-handle" id="resize-handle"></div>
+        <div class="panel-header" id="header-editor">
+          <span class="panel-header-label">SQL</span>
+          <button class="btn-minimize" onclick="togglePanel('editor')">&#x2212;</button>
+        </div>
+        <div class="editor-area" id="editor-area">
+          <textarea id="sql-input" placeholder="SELECT * FROM ...">${escapeHtml(data.currentAnswer)}</textarea>
+          <div class="actions">
+            <button class="btn-run" id="run-btn" onclick="runSQL()">実行</button>
+            <span class="shortcut-hint">Ctrl+Enter / Cmd+Enter で実行</span>
+            <span id="saved-indicator"></span>
+          </div>
+        </div>
+        <div class="resize-handle result-resize-handle" id="resize-handle-result" style="display:none"></div>
+        <div class="panel-header" id="header-result" style="display:none">
+          <span class="panel-header-label">実行結果</span>
+          <button class="btn-minimize" onclick="togglePanel('result')">&#x2212;</button>
+        </div>
+        <div class="result-area" id="result-area" style="display:none">
+          <div id="result-content"></div>
+        </div>
+      `;
+
+      document.getElementById('question-panel').innerHTML = renderMarkdown(data.question);
+
+      const textarea = document.getElementById('sql-input');
+      textarea.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          runSQL();
+        }
+      });
+      textarea.focus();
+      initResizer();
+    }
+
+    async function runSQL() {
+      const textarea = document.getElementById('sql-input');
+      const sql = textarea.value.trim();
+      if (!sql) return;
+
+      const btn = document.getElementById('run-btn');
+      btn.disabled = true;
+      btn.textContent = '実行中...';
+
+      const resultArea = document.getElementById('result-area');
+      const resultContent = document.getElementById('result-content');
+      document.getElementById('resize-handle-result').style.display = '';
+      document.getElementById('header-result').style.display = '';
+      resultArea.style.display = 'block';
+      initResizer();
+
+      try {
+        const res = await fetch(`/api/exercises/${currentIndex}/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          let html = `<div class="judge-banner fail"><span class="icon">&#10060;</span> 不正解 - SQLエラー</div>`;
+          html += `<div class="result-error">${escapeHtml(data.error)}</div>`;
+          resultContent.innerHTML = html;
+
+          exercises[currentIndex].status = 'fail';
+          renderList();
+        } else {
+          let html = '';
+
+          // 正誤判定バナー
+          if (data.testPassed) {
+            html += `<div class="judge-banner pass"><span class="icon">&#9989;</span> 正解！</div>`;
+          } else {
+            html += `<div class="judge-banner fail"><span class="icon">&#10060;</span> 不正解</div>`;
+            if (data.testMessage) {
+              html += `<div class="judge-detail">${escapeHtml(data.testMessage)}</div>`;
+            }
+          }
+
+          if (data.rows && data.rows.length > 0) {
+            html += '<table class="result-table"><thead><tr>';
+            data.columns.forEach(col => { html += `<th>${escapeHtml(col)}</th>`; });
+            html += '</tr></thead><tbody>';
+            data.rows.forEach(row => {
+              html += '<tr>';
+              data.columns.forEach(col => {
+                const val = row[col] === null ? 'NULL' : String(row[col]);
+                html += `<td>${escapeHtml(val)}</td>`;
+              });
+              html += '</tr>';
+            });
+            html += '</tbody></table>';
+            html += `<div class="result-info">${data.rowCount} rows</div>`;
+          } else if (data.command === 'SELECT') {
+            html += '<div class="result-info">0 rows</div>';
+          } else {
+            html += `<div class="result-success">${data.command} 成功 (${data.rowCount} rows affected)</div>`;
+          }
+
+          resultContent.innerHTML = html;
+
+          // 保存済み表示
+          document.getElementById('saved-indicator').innerHTML =
+            '<span class="saved-badge">answer.sql 保存済み</span>';
+          setTimeout(() => {
+            const el = document.getElementById('saved-indicator');
+            if (el) el.innerHTML = '';
+          }, 3000);
+
+          // サイドバー更新
+          exercises[currentIndex].status = data.testPassed ? 'pass' : 'fail';
+          renderList();
+        }
+      } catch (err) {
+        resultContent.innerHTML = `<div class="result-error">通信エラー: ${escapeHtml(err.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '実行';
+      }
+    }
+
+    const panelMap = {
+      question: { panelId: 'question-panel', headerId: 'header-question', handleId: 'resize-handle' },
+      editor:   { panelId: 'editor-area',    headerId: 'header-editor',   handleId: 'resize-handle-result' },
+      result:   { panelId: 'result-area',     headerId: 'header-result',   handleId: null },
+    };
+
+    function togglePanel(name) {
+      const cfg = panelMap[name];
+      const panel = document.getElementById(cfg.panelId);
+      const header = document.getElementById(cfg.headerId);
+      const btn = header.querySelector('.btn-minimize');
+      const handle = cfg.handleId ? document.getElementById(cfg.handleId) : null;
+      const isHidden = !panel.classList.contains('panel-hidden');
+
+      if (isHidden) {
+        // Save current size for restore
+        panel._savedHeight = panel.style.height || null;
+        panel._savedFlex = panel.style.flex || null;
+        panel.classList.add('panel-hidden');
+        header.classList.add('collapsed');
+        btn.innerHTML = '&#x2b;'; // +
+        if (handle) handle.style.display = 'none';
+      } else {
+        // Restore
+        panel.classList.remove('panel-hidden');
+        if (panel._savedHeight) {
+          panel.style.height = panel._savedHeight;
+          panel.style.flex = 'none';
+        } else if (panel._savedFlex) {
+          panel.style.flex = panel._savedFlex;
+        }
+        header.classList.remove('collapsed');
+        btn.innerHTML = '&#x2212;'; // −
+        if (handle) handle.style.display = '';
+      }
+    }
+
+    function setupHandle(handle, aboveId, belowId, minAbove, minBelow) {
+      if (!handle || handle._resizeAttached) return;
+      handle._resizeAttached = true;
+
+      handle.addEventListener('mousedown', e => {
+        e.preventDefault();
+        const above = document.getElementById(aboveId);
+        const below = document.getElementById(belowId);
+        if (!above || !below) return;
+
+        const startY = e.clientY;
+        const startAboveH = above.offsetHeight;
+        const startBelowH = below.offsetHeight;
+
+        above.style.flex = 'none';
+        below.style.flex = 'none';
+        above.style.height = startAboveH + 'px';
+        below.style.height = startBelowH + 'px';
+
+        handle.classList.add('active');
+
+        const onMouseMove = ev => {
+          const dy = ev.clientY - startY;
+          above.style.height = Math.max(minAbove, startAboveH + dy) + 'px';
+          below.style.height = Math.max(minBelow, startBelowH - dy) + 'px';
+        };
+
+        const onMouseUp = () => {
+          handle.classList.remove('active');
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    }
+
+    function initResizer() {
+      setupHandle(document.getElementById('resize-handle'), 'question-panel', 'editor-area', 80, 80);
+      setupHandle(document.getElementById('resize-handle-result'), 'editor-area', 'result-area', 80, 60);
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function renderMarkdown(md) {
+      const lines = md.split('\n');
+      let html = '';
+      let i = 0;
+
+      while (i < lines.length) {
+        const line = lines[i];
+
+        // Table: detect line starting with |
+        if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+          // Collect all consecutive table lines
+          const tableLines = [];
+          while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+            tableLines.push(lines[i].trim());
+            i++;
+          }
+          if (tableLines.length >= 2) {
+            html += '<table>';
+            tableLines.forEach((row, idx) => {
+              // Skip separator row (|---|---|)
+              if (/^\|[\s\-:|]+\|$/.test(row)) return;
+              const cells = row.slice(1, -1).split('|').map(c => c.trim());
+              const isHeader = idx === 0;
+              const tag = isHeader ? 'th' : 'td';
+              html += '<tr>' + cells.map(c => `<${tag}>${inlineMarkdown(c)}</${tag}>`).join('') + '</tr>';
+            });
+            html += '</table>';
+          }
+          continue;
+        }
+
+        // Headers
+        if (line.startsWith('### ')) { html += `<h3>${inlineMarkdown(line.slice(4))}</h3>`; i++; continue; }
+        if (line.startsWith('## ')) { html += `<h2>${inlineMarkdown(line.slice(3))}</h2>`; i++; continue; }
+        if (line.startsWith('# ')) { html += `<h1>${inlineMarkdown(line.slice(2))}</h1>`; i++; continue; }
+
+        // Empty line
+        if (line.trim() === '') { i++; continue; }
+
+        // Paragraph
+        html += `<p>${inlineMarkdown(line)}</p>`;
+        i++;
+      }
+
+      return html;
+    }
+
+    function inlineMarkdown(text) {
+      return text
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    }
+
+    loadExercises();
+  </script>
+</body>
+</html>

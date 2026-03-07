@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "jest",
-    "practice": "ts-node interactive.ts"
+    "practice": "cd db && docker compose up -d --wait && cd .. && ts-node server.ts"
   },
   "devDependencies": {
     "@types/jest": "^29",
@@ -13,5 +13,9 @@
     "ts-jest": "^29",
     "ts-node": "^10.9.2",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "express": "^5.2.1"
   }
 }
