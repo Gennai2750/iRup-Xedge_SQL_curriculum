@@ -29,6 +29,9 @@ describe('問題 4-4: レコードの削除', () => {
   });
 
   test('employee_id=5のレコードが削除され、合計4件になること', async () => {
+    // 外部キー制約を回避するため、関連するordersレコードを事前に削除
+    await client.query('DELETE FROM orders WHERE employee_id = 5');
+
     const sqlPath = path.join(__dirname, '../../exercises/04_dml/4_4_delete/answer.sql');
     const query = fs.readFileSync(sqlPath, 'utf-8');
     await client.query(query);

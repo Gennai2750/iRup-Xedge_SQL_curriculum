@@ -11,30 +11,163 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: リポジトリをチェックアウト
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
 
-      - name: Node.jsをセットアップ
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: 依存関係をインストール
+      - name: Install dependencies
         run: npm ci
 
-      - name: データベースを起動
-        run: |
-          docker compose -f db/docker-compose.yml up -d --wait
+      - name: Start database
+        run: docker compose -f db/docker-compose.yml up -d --wait
 
-      - name: 採点を実行
+      - name: Run tests
         id: grade
-        run: npx jest --no-coverage --verbose 2>&1 | tee grade_result.txt
-        continue-on-error: true
+        run: npx jest --no-coverage --json --outputFile=grade_result.json 2>/dev/null || true
 
-      - name: PRを検索してコメントを追加
+      - name: Build report
+        id: report
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // --- JSON読み込み ---
+            let json;
+            try {
+              json = JSON.parse(fs.readFileSync('grade_result.json', 'utf8'));
+            } catch {
+              core.setOutput('body', '## 採点結果\n\n採点結果の取得に失敗しました。ログを確認してください。');
+              return;
+            }
+
+            // --- 章の定義 ---
+            const chapters = [
+              { key: '01_select',       name: '第1章: データの基本抽出（SELECT）' },
+              { key: '02_aggregation',  name: '第2章: データの集計とグループ化' },
+              { key: '03_join',         name: '第3章: 複数テーブルの結合（JOIN）' },
+              { key: '04_dml',          name: '第4章: データの追加・更新・削除（DML）' },
+              { key: '05_ddl',          name: '第5章: テーブルの作成と構造変更（DDL）' },
+              { key: '06_advanced',     name: '第6章: 高度なクエリ（応用編）' },
+              { key: '07_antipattern',  name: '第7章: アンチパターン' },
+              { key: '08_practice',     name: '第8章: 実践総合演習' },
+            ];
+
+            // --- テスト結果を章ごとに分類 ---
+            const chapterResults = {};
+            for (const ch of chapters) {
+              chapterResults[ch.key] = { name: ch.name, suites: [] };
+            }
+
+            for (const suite of json.testResults) {
+              const filePath = suite.name;
+              const matched = chapters.find(ch => filePath.includes(ch.key));
+              if (!matched) continue;
+
+              // テストスイート名（describe名）
+              const suiteName = suite.testResults.length > 0
+                ? suite.testResults[0].ancestorTitles[0] || ''
+                : '';
+
+              const tests = suite.testResults.map(t => ({
+                name: t.title,
+                passed: t.status === 'passed',
+                message: t.status !== 'passed' ? (t.failureMessages || []).join('\n').slice(0, 200) : '',
+              }));
+
+              chapterResults[matched.key].suites.push({ suiteName, tests });
+            }
+
+            // --- スコア集計 ---
+            const totalPassed = json.numPassedTests;
+            const totalTests = json.numTotalTests;
+            const allPassed = json.numFailedTests === 0;
+
+            // --- レポート生成 ---
+            let body = '';
+
+            // ヘッダー
+            if (allPassed) {
+              body += `## :100: 採点結果: ${totalPassed} / ${totalTests} 問正解 - ALL CLEAR!\n\n`;
+            } else {
+              body += `## :memo: 採点結果: ${totalPassed} / ${totalTests} 問正解\n\n`;
+            }
+
+            // プログレスバー
+            const percent = Math.round((totalPassed / totalTests) * 100);
+            const filled = Math.round(percent / 5);
+            const empty = 20 - filled;
+            const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
+            body += `**進捗**: \`${bar}\` **${percent}%**\n\n`;
+
+            body += `| ブランチ | 正解数 | 合計 | 正答率 |\n`;
+            body += `|---|---|---|---|\n`;
+            body += `| \`${process.env.GITHUB_REF_NAME || ''}\` | ${totalPassed} | ${totalTests} | ${percent}% |\n\n`;
+
+            body += `---\n\n`;
+
+            // 章ごとの結果
+            for (const ch of chapters) {
+              const data = chapterResults[ch.key];
+              if (data.suites.length === 0) continue;
+
+              let chPassed = 0;
+              let chTotal = 0;
+              for (const s of data.suites) {
+                for (const t of s.tests) {
+                  chTotal++;
+                  if (t.passed) chPassed++;
+                }
+              }
+
+              const chIcon = chPassed === chTotal ? ':white_check_mark:' : ':x:';
+              body += `### ${chIcon} ${data.name} (${chPassed}/${chTotal})\n\n`;
+
+              body += `| 結果 | 問題 |\n`;
+              body += `|:---:|---|\n`;
+
+              for (const s of data.suites) {
+                for (const t of s.tests) {
+                  const icon = t.passed ? ':white_check_mark:' : ':x:';
+                  body += `| ${icon} | ${t.name} |\n`;
+                }
+              }
+              body += `\n`;
+
+              // 失敗した問題のエラー詳細
+              const failures = [];
+              for (const s of data.suites) {
+                for (const t of s.tests) {
+                  if (!t.passed && t.message) {
+                    failures.push(t);
+                  }
+                }
+              }
+              if (failures.length > 0) {
+                body += `<details><summary>エラー詳細</summary>\n\n`;
+                for (const f of failures) {
+                  // ANSIコードを除去
+                  const clean = f.message.replace(/\x1b\[[0-9;]*m/g, '');
+                  body += `**${f.name}**\n\`\`\`\n${clean}\n\`\`\`\n\n`;
+                }
+                body += `</details>\n\n`;
+              }
+            }
+
+            body += `---\n`;
+            body += `> このコメントは自動採点システムによって生成されました。\n`;
+
+            core.setOutput('body', body);
+
+      - name: Comment on PR
         if: always()
         uses: actions/github-script@v7
         with:
@@ -42,81 +175,53 @@ jobs:
             const branch = '${{ github.ref_name }}';
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const fs = require('fs');
+            const body = `${{ steps.report.outputs.body }}`;
 
-            // 採点結果を読み込み
-            let result = '採点結果の取得に失敗しました';
-            try {
-              if (fs.existsSync('grade_result.txt')) {
-                result = fs.readFileSync('grade_result.txt', 'utf8');
-              }
-            } catch (e) {
-              console.log('結果ファイルの読み込みに失敗:', e);
-            }
+            if (!body) return;
 
-            // ブランチ名に対応するPRを検索
+            // PRを検索
             let prNumber = null;
             try {
               const { data: pulls } = await github.rest.pulls.list({
-                owner,
-                repo,
+                owner, repo,
                 head: owner + ':' + branch,
                 state: 'open'
               });
-
               if (pulls.length > 0) {
                 prNumber = pulls[0].number;
               } else {
                 const { data: allPulls } = await github.rest.pulls.list({
-                  owner,
-                  repo,
-                  state: 'open'
+                  owner, repo, state: 'open'
                 });
                 const found = allPulls.find(pr => pr.head.ref === branch);
-                if (found) {
-                  prNumber = found.number;
-                }
+                if (found) prNumber = found.number;
               }
             } catch (e) {
-              console.log('PR検索エラー:', e);
+              console.log('PR search error:', e);
             }
 
             if (!prNumber) {
-              core.warning('ブランチ "' + branch + '" に対応するオープンなPRが見つかりませんでした。');
+              core.warning('No open PR found for branch: ' + branch);
               return;
             }
 
-            const comment = '## 📊 採点結果\n\n' +
-              '**ブランチ**: `' + branch + '`\n\n' +
-              '```\n' +
-              result +
-              '\n```\n\n' +
-              '---\n' +
-              'このコメントは自動採点システムによって追加されました。';
-
             try {
               await github.rest.issues.createComment({
-                owner,
-                repo,
+                owner, repo,
                 issue_number: prNumber,
-                body: comment
+                body: body
               });
-              core.notice('PR #' + prNumber + ' にコメントを追加しました。');
+              core.notice('Comment added to PR #' + prNumber);
             } catch (e) {
-              core.error('PR #' + prNumber + ' へのコメント追加に失敗: ' + e.message);
+              core.error('Failed to comment on PR #' + prNumber + ': ' + e.message);
             }
 
-      - name: 採点結果をSummaryに出力
+      - name: Job Summary
         if: always()
-        run: |
-          echo "## 📊 採点結果" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**ブランチ**: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f grade_result.txt ]; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat grade_result.txt >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "詳細はログを確認してください。" >> $GITHUB_STEP_SUMMARY
-          fi
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `${{ steps.report.outputs.body }}`;
+            if (body) {
+              core.summary.addRaw(body).write();
+            }
