@@ -1,1 +1,1 @@
--- ここに回答を記述してください
+SELECT * FROM employees WHERE salary >= 60000;

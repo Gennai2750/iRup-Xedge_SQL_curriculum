@@ -1,1 +1,1 @@
-
+SELECT COUNT(*) FROM employees;
